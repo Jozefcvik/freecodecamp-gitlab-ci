@@ -1,0 +1,94 @@
+stages:
+  - .pre
+  - build
+  - test build
+  - staging
+  - production
+
+
+# .PRE
+
+linter:
+  image: node:24-alpine
+  stage: .pre
+  script:
+    - npm install
+    - npm run lint
+
+unit tests:
+  image: node:24-alpine
+  stage: .pre
+  script:
+    - npm install
+    - npm run test
+
+
+# BUILD
+
+build website:
+  image: node:24-alpine
+  stage: build
+  script: 
+    - apk add curl
+    - npm install
+    - npm run build
+    - echo $CI_PIPELINE_IID > build/app_version.txt
+    - cat build/app_version.txt | grep $CI_PIPELINE_IID
+  artifacts:  
+    paths: 
+      - build
+
+
+# TEST BUILD
+
+test website:
+  image: node:24-alpine
+  stage: test build
+  script:
+    - npm install
+    - apk add curl
+    - npm run start &
+    - sleep 10
+    - cat build/app_version.txt | grep $CI_PIPELINE_IID
+    - echo "Checking HTML output for 'React App'"
+    - curl http://localhost:3000 > output.html
+    - cat output.html
+    - if grep -q "React App" output.html; then
+        echo "✔ Found 'React App' in HTML output";
+      else
+        echo "❌ 'React App' not found in HTML output";
+        exit 1;
+      fi
+
+
+# DEPLOY
+
+.deploy:
+  image: 
+    name: amazon/aws-cli
+    entrypoint: [""]
+  script:
+    - aws --version
+    - aws s3 sync build s3://$AWS_S3_BUCKET --delete
+    - curl $CI_ENVIRONMENT_URL | grep "React App"
+    - cat build/app_version.txt | grep $CI_PIPELINE_IID
+
+
+
+# STAGING
+
+deploy to staging:
+  stage: staging
+  environment: staging
+  extends: .deploy
+
+
+# PRODUCTION
+
+deploy to prodction:
+  stage: production
+  when: manual
+  environment: production
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+  extends: .deploy
