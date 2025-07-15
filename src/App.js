@@ -13,7 +13,7 @@ function App() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          Learn GitLab CI Hurra :) 
+          Learn GitLab CI Hurra from github :) 
         </a>
       </header>
     </div>
