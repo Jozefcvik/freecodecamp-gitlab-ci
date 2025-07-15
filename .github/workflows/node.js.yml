@@ -81,7 +81,7 @@ jobs:
           name: build
           path: build/
       - run: aws --version
-      - run: aws s3 sync build s3://$AWS_S3_BUCKET --delete
+      - run: aws s3 sync build s3://gitlab-jozef-staging --delete
       - run: curl $CI_ENVIRONMENT_URL | grep "React App"
       - run: cat build/app_version.txt | grep $GITHUB_RUN_ID
 
