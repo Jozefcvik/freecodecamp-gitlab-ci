@@ -1,0 +1,70 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+    container: node:24-alpine
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm install
+      - run: npm run lint
+
+  unit_tests:
+    runs-on: ubuntu-latest
+    container: node:24-alpine
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm install
+      - run: npm run test
+
+  build_website:
+    runs-on: ubuntu-latest
+    container: node:24-alpine
+    needs: [linter, unit_tests]
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm install
+      - run: npm run build
+      - run: echo $GITHUB_RUN_ID > build/app_version.txt
+      - run: cat build/app_version.txt | grep $GITHUB_RUN_ID
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: build/
+
+  test_website:
+    runs-on: ubuntu-latest
+    container: node:24-alpine
+    needs: [build_website]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download Build
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: build/
+      - run: npm install
+      - run: apk add curl
+      - run: |
+          npm run start &
+          sleep 10
+          cat build/app_version.txt | grep $GITHUB_RUN_ID
+          echo "Checking HTML output for 'React App'"
+          curl http://localhost:3000 > output.html
+          cat output.html
+          if grep -q "React App" output.html; then
+            echo "✔ Found 'React App' in HTML output"
+          else
+            echo "❌ 'React App' not found in HTML output"
+            exit 1
+          fi
